@@ -1,0 +1,477 @@
+[
+  {
+    "notebook": "cse445-yolov12s-hand-pose-training.ipynb",
+    "total_cells": 18,
+    "markdown_cells": 9,
+    "code_cells": 9,
+    "headings": [
+      "# \u270b Hand Pose Estimation \u2014 YOLOv12s Training Pipeline",
+      "## CSE 445 \u2014 Computer Vision | Assignment 2",
+      "## \ud83d\udccc Pipeline Overview",
+      "## \ud83d\udd2c Model Selection Justification \u2014 YOLOv12s vs YOLOv26s",
+      "## \ud83d\udcc2 Kaggle Dataset Instructions",
+      "## \ud83d\udce6 Step 1 \u2014 Environment Setup & Version Verification",
+      "## \ud83d\udcc2 Step 2 \u2014 Dataset Inspection & Exploratory Analysis",
+      "### Dataset Characteristics",
+      "## \u2699\ufe0f Step 3 \u2014 Dataset Preparation (90/10 Train/Val Split & YAML Config)",
+      "### Problem",
+      "### Solution",
+      "### Pose Configuration",
+      "## \ud83c\udfa8 Step 4 \u2014 Dataset Visualization",
+      "## \ud83c\udfcb\ufe0f Step 5 \u2014 YOLOv12s-Pose Model Training",
+      "### Training Configuration",
+      "### Data Augmentation",
+      "## \ud83d\udcca Step 6 \u2014 Explicit Model Evaluation & Training Metrics",
+      "### 6a \u2014 `model.val()` Evaluation",
+      "### 6b \u2014 Training Curves",
+      "## \ud83d\udd0d Step 7 \u2014 Pose Estimation Inference on Held-Out Validation Images",
+      "## \ud83d\udcbe Step 8 \u2014 Export Trained Weights"
+    ],
+    "code_overview": [
+      {
+        "cell_number": 3,
+        "preview": "# =============================================================================\n# Install / upgrade required packages\n# ultralytics >= 8.3 includes YOLO12 architecture support\n# lapx         required by ByteTrack's C++ association extension\n# =============================================================================\n!pip install -q ultralytics lapx\n\nimport ultralytics\nultralytics.checks()  # Prints YOLO version, CUDA status, and environment info"
+      },
+      {
+        "cell_number": 5,
+        "preview": "import glob\nimport yaml\nimport shutil\nimport numpy as np\nimport cv2\nimport matplotlib.pyplot as plt\nfrom pathlib import Path\nimport random\n\n# \u2500\u2500 Locate dataset \u2014 Kaggle mounts under /kaggle/input/ \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+      },
+      {
+        "cell_number": 7,
+        "preview": "# \u2500\u2500 Create 90/10 train/val split in /kaggle/working/ \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n# /kaggle/input/ is read-only \u2192 we must write to /kaggle/working/\n\nPREPARED_ROOT = os.path.join(KAGGLE_OUTPUT, \"Hand_Prepared\")\nVAL_RATIO     = 0.10\nRANDOM_SEED   = 42\n\n# 21 standard hand landmark names\nKEYPOINT_NAMES = [\n    \"wrist\","
+      },
+      {
+        "cell_number": 9,
+        "preview": "FINGER_COLORS = [\n    (255,  0,  0),   # Thumb  \u2014 red\n    (  0,255,  0),   # Index  \u2014 green\n    (  0,  0,255),   # Middle \u2014 blue\n    (255,255,  0),   # Ring   \u2014 yellow\n    (255,  0,255),   # Pinky  \u2014 magenta\n]\n\ndef visualize_pose_samples(root, split, n=8):\n    \"\"\"Draw GT annotations: bounding box, skeleton, and keypoints.\"\"\""
+      },
+      {
+        "cell_number": 11,
+        "preview": "from ultralytics import YOLO\nimport time\n\n# \u2500\u2500 Print model summary \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nmodel = YOLO(\"yolo12s-pose.yaml\")\nprint(f\"\\n{'='*60}\")\nprint(f\"  Model:         YOLOv12s-Pose\")\nprint(f\"  Architecture:  yolo12s-pose.yaml\")\nprint(f\"  Pretrained:    No (training from scratch)\")\nprint(f\"  Device:        {DEVICE}\")"
+      },
+      {
+        "cell_number": 13,
+        "preview": "import pandas as pd\n\n# \u2500\u2500 6a: Load best weights & run validation \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nweight_path = BEST_WEIGHTS if os.path.exists(BEST_WEIGHTS) else LAST_WEIGHTS\n\nif os.path.exists(weight_path):\n    trained_model = YOLO(weight_path)\n    print(f\"\u2705 Loaded: {weight_path}\")\n\n    print(f\"\\n{'='*60}\")"
+      },
+      {
+        "cell_number": 14,
+        "preview": "# \u2500\u2500 6b: Training curve plots \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncsv_path = os.path.join(RESULTS_DIR, \"results.csv\")\n\nif os.path.exists(csv_path):\n    df = pd.read_csv(csv_path)\n    df.columns = df.columns.str.strip()\n    print(f\"Epochs trained: {len(df)}\")\n\n    # \u2500\u2500 Loss curves \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    loss_cols = [c for c in df.columns if 'loss' in c.lower()]"
+      },
+      {
+        "cell_number": 16,
+        "preview": "if os.path.exists(weight_path):\n    val_img_dir = os.path.join(PREPARED_ROOT, \"val\", \"images\")\n    val_imgs    = sorted(glob.glob(os.path.join(val_img_dir, \"*.jpg\")))[:6]\n    if not val_imgs:\n        val_imgs = sorted(glob.glob(os.path.join(val_img_dir, \"*.png\")))[:6]\n\n    if val_imgs:\n        fig, axs = plt.subplots(2, 3, figsize=(18, 12))\n        axs = axs.flatten()\n        for i, img_path in enumerate(val_imgs):"
+      },
+      {
+        "cell_number": 18,
+        "preview": "import shutil\n\n# \u2500\u2500 Copy best.pt to output root for easy download \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nexport_dst = os.path.join(KAGGLE_OUTPUT, \"yolo12s_hand_best.pt\")\nif os.path.exists(BEST_WEIGHTS):\n    shutil.copy2(BEST_WEIGHTS, export_dst)\n    size_mb = os.path.getsize(export_dst) / 1e6\n    print(f\"\u2705 Weights exported: {export_dst} ({size_mb:.1f} MB)\")\nelif os.path.exists(LAST_WEIGHTS):\n    shutil.copy2(LAST_WEIGHTS, export_dst)"
+      }
+    ],
+    "hyperparameters": {
+      "split": [
+        ">5"
+      ],
+      "epochs": [
+        "50"
+      ],
+      "imgsz": [
+        "640"
+      ],
+      "batch": [
+        "16"
+      ],
+      "device": [
+        "DEVICE"
+      ],
+      "patience": [
+        "15"
+      ],
+      "workers": [
+        "4"
+      ],
+      "project": [
+        "os.path.join(KAGGLE_OUTPUT"
+      ],
+      "name": [
+        "yolo12s_hand",
+        "yolo12s_hand_val"
+      ],
+      "model": [
+        "YOLO(\"yolo12s-pose.yaml"
+      ],
+      "data": [
+        "CUSTOM_YAML"
+      ]
+    },
+    "metric_hits": {
+      "mAP50": [
+        "95"
+      ],
+      "precision": [
+        "0.9585"
+      ],
+      "recall": [
+        "0.9238"
+      ]
+    },
+    "stdout_samples": [
+      {
+        "cell_number": 3,
+        "text": "Ultralytics 8.4.38 \ud83d\ude80 Python-3.12.12 torch-2.10.0+cu128 CUDA:0 (Tesla T4, 14913MiB)\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "Setup complete \u2705 (4 CPUs, 31.4 GB RAM, 6841.9/8062.4 GB disk)\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "============================================================\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  Python:        3.12.12\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  Ultralytics:   8.4.38\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  PyTorch:       2.10.0+cu128\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  CUDA Available: True\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  CUDA Version:  12.8\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  GPU Name:      Tesla T4\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  GPU Memory:    15.6 GB\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  Selected Device: 0\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  Platform:      Linux-6.6.113+-x86_64-with-glibc2.35\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "============================================================\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "\u2705 CUDA GPU ready: Tesla T4 (15.6 GB)\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  Input dir:  /kaggle/input\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  Output dir: /kaggle/working\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  Input contents: ['datasets']\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "Dataset root: /kaggle/input/datasets/turjo410/handposition/Hand.v8i.yolov8\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "Exists: True\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "============================================================\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  Original data.yaml:\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "============================================================\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  train: ../train/images\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  val: ../valid/images\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  test: ../test/images\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  kpt_shape: [21, 3]\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  flip_idx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  nc: 1\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  names: ['hand']\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  roboflow: {'workspace': 'handkeypoints', 'project': 'hand-64xkf', 'version': 8, 'license': 'CC BY 4.0', 'url': 'https://universe.roboflow.com/handkeypoints/hand-64xkf/dataset/8'}\n"
+      }
+    ],
+    "images": [
+      "assets/extracted/cse445-yolov12s-hand-pose-training-cell9-out1.png",
+      "assets/extracted/cse445-yolov12s-hand-pose-training-cell14-out2.png",
+      "assets/extracted/cse445-yolov12s-hand-pose-training-cell14-out3.png",
+      "assets/extracted/cse445-yolov12s-hand-pose-training-cell16-out1.png"
+    ]
+  },
+  {
+    "notebook": "cse445-yolov12s-video-tracking.ipynb",
+    "total_cells": 17,
+    "markdown_cells": 9,
+    "code_cells": 8,
+    "headings": [
+      "# \ud83c\udfac Hand Pose Video Tracking \u2014 ByteTrack & BoT-SORT",
+      "## CSE 445 \u2014 Computer Vision | Assignment 2",
+      "## \ud83d\udccc Pipeline Overview",
+      "## \ud83d\udcc2 Kaggle Setup Instructions",
+      "## \ud83d\udd17 Tracking Integration \u2014 How Pose + Tracking Work Together",
+      "## \ud83d\udce6 Step 1 \u2014 Environment Setup & Inputs",
+      "## \ud83c\udf9e\ufe0f Step 2 \u2014 Video Source Documentation",
+      "### Video Properties",
+      "### Preprocessing Applied",
+      "## \ud83c\udfc3 Step 3 \u2014 ByteTrack Multi-Hand Video Tracking",
+      "### ByteTrack Algorithm",
+      "### Configuration",
+      "## \ud83c\udfc3 Step 4 \u2014 BoT-SORT Multi-Hand Video Tracking",
+      "### BoT-SORT Algorithm",
+      "### Configuration",
+      "## \ud83d\udd2c Step 5 \u2014 Side-by-Side Frame Comparison",
+      "## \ud83d\udcca Step 6 \u2014 Quantitative Analysis",
+      "## \ud83d\udd0d Step 7 \u2014 Failure Case Analysis & Conclusions",
+      "### 7a. Failure Case Taxonomy",
+      "### 7b. Expected vs Observed Behavior",
+      "### 7c. Algorithmic Insights",
+      "## \ud83d\udcdd Step 7d \u2014 Conclusion",
+      "### Which tracker performed better?",
+      "### Key Observations",
+      "### Lessons Learned"
+    ],
+    "code_overview": [
+      {
+        "cell_number": 3,
+        "preview": "# =============================================================================\n# Install required packages\n# lapx: C++ extension required by ByteTrack's Hungarian algorithm\n# =============================================================================\n!pip install -q ultralytics lapx\n\nimport ultralytics\nultralytics.checks()\n\nimport torch"
+      },
+      {
+        "cell_number": 5,
+        "preview": "# \u2500\u2500 Print video metadata \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\ncap = cv2.VideoCapture(VIDEO_PATH)\nFPS    = cap.get(cv2.CAP_PROP_FPS)\nW      = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))\nH      = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))\nNFRAME = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))\n\n# Extract sample frames for preview\nsample_frames = []\nfor fidx in np.linspace(0, max(NFRAME-1, 1), 4, dtype=int):"
+      },
+      {
+        "cell_number": 7,
+        "preview": "# \u2500\u2500 ByteTrack configuration YAML \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nbytetrack_cfg = {\n    'tracker_type':      'bytetrack',\n    'track_high_thresh': 0.5,\n    'track_low_thresh':  0.1,\n    'new_track_thresh':  0.6,\n    'track_buffer':      30,\n    'match_thresh':      0.8,\n    'fuse_score':        True,\n}"
+      },
+      {
+        "cell_number": 9,
+        "preview": "# \u2500\u2500 BoT-SORT configuration YAML \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nbotsort_cfg = {\n    'tracker_type':      'botsort',\n    'track_high_thresh': 0.5,\n    'track_low_thresh':  0.1,\n    'new_track_thresh':  0.6,\n    'track_buffer':      30,\n    'match_thresh':      0.8,\n    'fuse_score':        True,\n    # BoT-SORT specific"
+      },
+      {
+        "cell_number": 11,
+        "preview": "def extract_frames(video_path, frame_indices):\n    \"\"\"Extract specific frames from a video file.\"\"\"\n    frames = {}\n    cap = cv2.VideoCapture(video_path)\n    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))\n    for fi in frame_indices:\n        fi_clamped = min(fi, total - 1)\n        cap.set(cv2.CAP_PROP_POS_FRAMES, fi_clamped)\n        ret, frm = cap.read()\n        if ret:"
+      },
+      {
+        "cell_number": 13,
+        "preview": "def analyze_tracking_results(results, tracker_name):\n    \"\"\"Compute tracking statistics from ultralytics result list.\"\"\"\n    all_ids         = []\n    det_per_frame   = []\n    id_switches     = 0\n    track_lifetimes = {}   # id \u2192 frame count\n    prev_ids        = set()\n\n    for r in results:\n        if r.boxes is not None and r.boxes.id is not None:"
+      },
+      {
+        "cell_number": 14,
+        "preview": "# \u2500\u2500 Plot detection density per frame \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nframes_x = list(range(len(bt_stats['det_per_frame'])))\nfig, axs = plt.subplots(2, 1, figsize=(16, 8), sharex=True)\n\naxs[0].plot(frames_x, bt_stats['det_per_frame'], color='steelblue', linewidth=0.8, alpha=0.8)\naxs[0].fill_between(frames_x, bt_stats['det_per_frame'], alpha=0.2, color='steelblue')\naxs[0].set_ylabel('Detections')\naxs[0].set_title('ByteTrack \u2014 Detections per Frame', fontsize=11)\naxs[0].grid(True, alpha=0.3)"
+      },
+      {
+        "cell_number": 16,
+        "preview": "# \u2500\u2500 Final comparison bar chart \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nmetrics     = ['Unique IDs Issued', 'ID Switch Events', 'Zero-Detection Frames']\nbt_vals     = [bt_stats['unique_ids'], bt_stats['id_switches'], bt_stats['zero_frames']]\nbs_vals     = [bs_stats['unique_ids'], bs_stats['id_switches'], bs_stats['zero_frames']]\n\nx     = np.arange(len(metrics))\nwidth = 0.35\nfig, ax = plt.subplots(figsize=(10, 6))\nbars1 = ax.bar(x - width/2, bt_vals, width, label='ByteTrack', color='steelblue', alpha=0.85)\nbars2 = ax.bar(x + width/2, bs_vals, width, label='BoT-SORT',  color='tomato',    alpha=0.85)"
+      }
+    ],
+    "hyperparameters": {
+      "model": [
+        "YOLO(MODEL_PATH"
+      ],
+      "imgsz": [
+        "640"
+      ],
+      "device": [
+        "DEVICE"
+      ],
+      "conf": [
+        "0.30"
+      ],
+      "iou": [
+        "0.50"
+      ],
+      "project": [
+        "os.path.join(KAGGLE_OUTPUT"
+      ],
+      "name": [
+        "bytetrack",
+        "botsort"
+      ],
+      "tracker": [
+        "bytetrack_yaml",
+        "botsort_yaml"
+      ],
+      "max_det": [
+        "max(det_per_frame"
+      ]
+    },
+    "metric_hits": {
+      "fps": [
+        "25.0",
+        "26.5",
+        "16.9"
+      ]
+    },
+    "stdout_samples": [
+      {
+        "cell_number": 3,
+        "text": "Ultralytics 8.4.41 \ud83d\ude80 Python-3.12.12 torch-2.10.0+cu128 CUDA:0 (Tesla T4, 14913MiB)\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "Setup complete \u2705 (4 CPUs, 31.4 GB RAM, 6841.9/8062.4 GB disk)\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "\u2705 CUDA GPU: Tesla T4 (15.6 GB)\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "   PyTorch:     2.10.0+cu128\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "   Ultralytics: 8.4.41\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "============================================================\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  Model: /kaggle/input/datasets/turjo410/best-ptt/best.pt\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  Exists: True\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  Video: /kaggle/input/datasets/turjo410/videoooo/10209557-hd_720_1366_25fps.mp4\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "  Exists: True\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "============================================================\n"
+      },
+      {
+        "cell_number": 3,
+        "text": "\u2705 Model loaded: /kaggle/input/datasets/turjo410/best-ptt/best.pt\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "============================================================\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  Video:      10209557-hd_720_1366_25fps.mp4\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  Resolution: 720 \u00d7 1366\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  FPS:        25.0\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  Frames:     1423\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  Duration:   56.9 s\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "  File size:  11.5 MB\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "============================================================\n"
+      },
+      {
+        "cell_number": 5,
+        "text": "<Figure size 2000x400 with 4 Axes>"
+      },
+      {
+        "cell_number": 5,
+        "text": "\u2705 Saved: video_sample_frames.png\n"
+      },
+      {
+        "cell_number": 7,
+        "text": "\u2705 ByteTrack config saved: /kaggle/working/bytetrack_config.yaml\n"
+      },
+      {
+        "cell_number": 7,
+        "text": "============================================================\n"
+      },
+      {
+        "cell_number": 7,
+        "text": "  Running ByteTrack on: 10209557-hd_720_1366_25fps.mp4\n"
+      },
+      {
+        "cell_number": 7,
+        "text": "============================================================\n"
+      },
+      {
+        "cell_number": 7,
+        "text": "video 1/1 (frame 1/1423) /kaggle/input/datasets/turjo410/videoooo/10209557-hd_720_1366_25fps.mp4: 640x352 1 hand, 69.9ms\n"
+      },
+      {
+        "cell_number": 7,
+        "text": "video 1/1 (frame 2/1423) /kaggle/input/datasets/turjo410/videoooo/10209557-hd_720_1366_25fps.mp4: 640x352 1 hand, 22.3ms\n"
+      },
+      {
+        "cell_number": 7,
+        "text": "video 1/1 (frame 3/1423) /kaggle/input/datasets/turjo410/videoooo/10209557-hd_720_1366_25fps.mp4: 640x352 1 hand, 15.1ms\n"
+      },
+      {
+        "cell_number": 7,
+        "text": "video 1/1 (frame 4/1423) /kaggle/input/datasets/turjo410/videoooo/10209557-hd_720_1366_25fps.mp4: 640x352 1 hand, 14.9ms\n"
+      }
+    ],
+    "images": [
+      "assets/extracted/cse445-yolov12s-video-tracking-cell5-out2.png",
+      "assets/extracted/cse445-yolov12s-video-tracking-cell11-out1.png",
+      "assets/extracted/cse445-yolov12s-video-tracking-cell14-out1.png",
+      "assets/extracted/cse445-yolov12s-video-tracking-cell16-out1.png"
+    ]
+  }
+]

@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hand Pose Project Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-1: #fef7e5;
+      --bg-2: #e4fff2;
+      --bg-3: #dff3ff;
+      --card: #fffdf7;
+      --ink: #102029;
+      --muted: #47606d;
+      --c1: #ff7b00;
+      --c2: #1fbf75;
+      --c3: #1588ff;
+      --c4: #ef476f;
+      --c5: #ffd166;
+      --line: rgba(16, 32, 41, 0.12);
+      --shadow: 0 14px 40px rgba(16, 32, 41, 0.12);
+      --radius: 22px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(255, 123, 0, 0.22), transparent 36%),
+        radial-gradient(circle at 88% 5%, rgba(31, 191, 117, 0.22), transparent 35%),
+        radial-gradient(circle at 76% 80%, rgba(21, 136, 255, 0.16), transparent 42%),
+        linear-gradient(125deg, var(--bg-1), var(--bg-2), var(--bg-3));
+      font-family: "Bricolage Grotesque", sans-serif;
+      line-height: 1.4;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .grain {
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(rgba(16, 32, 41, 0.04) 0.6px, transparent 0.6px);
+      background-size: 3px 3px;
+      pointer-events: none;
+      z-index: -1;
+      opacity: 0.42;
+    }
+
+    .wrap {
+      width: min(1240px, calc(100% - 2.4rem));
+      margin: 1.6rem auto 2.4rem;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .panel {
+      background: rgba(255, 253, 247, 0.88);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+      padding: 1.05rem;
+      backdrop-filter: blur(6px);
+      transform: translateY(10px);
+      opacity: 0;
+      animation: rise 0.65s ease forwards;
+    }
+
+    .hero {
+      background:
+        linear-gradient(125deg, rgba(255, 123, 0, 0.94), rgba(255, 209, 102, 0.9) 42%, rgba(21, 136, 255, 0.92));
+      color: #ffffff;
+      border: none;
+      padding: 1.35rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -4.2rem;
+      top: -4.2rem;
+      width: 16rem;
+      height: 16rem;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.17);
+    }
+
+    .hero h1 {
+      margin: 0 0 0.35rem;
+      font-size: clamp(1.35rem, 2.6vw, 2.3rem);
+      line-height: 1.02;
+      letter-spacing: 0.02em;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 72ch;
+      font-size: 1rem;
+      color: #f8fbff;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      margin-top: 0.9rem;
+    }
+
+    .chip {
+      border: 1px solid rgba(255, 255, 255, 0.33);
+      border-radius: 999px;
+      padding: 0.28rem 0.72rem;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.8rem;
+      background: rgba(255, 255, 255, 0.17);
+    }
+
+    .title {
+      margin: 0 0 0.8rem;
+      font-size: 1.03rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+    }
+
+    .title small {
+      color: var(--muted);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.74rem;
+      font-weight: 500;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      padding: 0.78rem;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.83), rgba(255, 253, 247, 0.75));
+      min-height: 106px;
+      display: grid;
+      gap: 0.15rem;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .metric .value {
+      font-size: 1.54rem;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+      line-height: 1.1;
+    }
+
+    .metric .note {
+      color: var(--muted);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.72rem;
+    }
+
+    .v-orange { color: var(--c1); }
+    .v-green { color: var(--c2); }
+    .v-blue { color: var(--c3); }
+    .v-rose { color: var(--c4); }
+
+    .split-2 {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 1rem;
+    }
+
+    .chart-wrap {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #ffffff;
+      padding: 0.75rem;
+      min-height: 330px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #ffffff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 560px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.56rem 0.65rem;
+      border-bottom: 1px solid rgba(16, 32, 41, 0.07);
+      font-size: 0.92rem;
+    }
+
+    th {
+      font-size: 0.76rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-family: "IBM Plex Mono", monospace;
+      background: rgba(255, 123, 0, 0.08);
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.7rem;
+    }
+
+    .video-shell {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 16% 14%, rgba(255, 123, 0, 0.18), transparent 48%),
+        radial-gradient(circle at 84% 12%, rgba(21, 136, 255, 0.16), transparent 52%),
+        linear-gradient(120deg, #ffffff, #f8fcff);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+      aspect-ratio: 16 / 9;
+    }
+
+    .video-shell iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+
+    .media-note {
+      margin: 0.7rem 0 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .link-cards {
+      display: grid;
+      gap: 0.7rem;
+    }
+
+    .resource-card {
+      display: block;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      padding: 0.84rem;
+      text-decoration: none;
+      color: var(--ink);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(248, 252, 255, 0.93));
+      box-shadow: 0 8px 22px rgba(16, 32, 41, 0.08);
+    }
+
+    .resource-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 28px rgba(16, 32, 41, 0.15);
+    }
+
+    .resource-card strong {
+      display: block;
+      margin-bottom: 0.3rem;
+      font-size: 1rem;
+    }
+
+    .resource-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-family: "IBM Plex Mono", monospace;
+      word-break: break-all;
+    }
+
+    .resource-card.kaggle {
+      background:
+        linear-gradient(145deg, rgba(31, 191, 117, 0.16), rgba(255, 255, 255, 0.95));
+    }
+
+    .resource-card.youtube {
+      background:
+        linear-gradient(145deg, rgba(239, 71, 111, 0.18), rgba(255, 255, 255, 0.96));
+    }
+
+    figure {
+      margin: 0;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      overflow: hidden;
+      background: #fff;
+      transition: transform 0.25s ease;
+      cursor: zoom-in;
+    }
+
+    figure:hover {
+      transform: translateY(-4px);
+    }
+
+    img {
+      width: 100%;
+      display: block;
+      aspect-ratio: 16 / 10;
+      object-fit: cover;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(45deg, #f9fafb, #f2f5f7);
+    }
+
+    figcaption {
+      font-size: 0.74rem;
+      color: var(--muted);
+      padding: 0.46rem 0.5rem;
+      font-family: "IBM Plex Mono", monospace;
+      min-height: 2.6rem;
+    }
+
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      background: rgba(6, 18, 26, 0.86);
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .lightbox.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .lightbox-inner {
+      width: min(1200px, 96vw);
+      max-height: 94vh;
+      display: grid;
+      justify-items: center;
+      gap: 0.55rem;
+    }
+
+    .lightbox img {
+      width: auto;
+      max-width: 100%;
+      max-height: 82vh;
+      border-radius: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+      background: #ffffff;
+    }
+
+    .lightbox-caption {
+      color: #f5fbff;
+      font-size: 0.92rem;
+      text-align: center;
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .lightbox-close {
+      justify-self: end;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.13);
+      color: #ffffff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.78rem;
+      padding: 0.28rem 0.7rem;
+      cursor: pointer;
+    }
+
+    .lightbox-close:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    body.lightbox-open {
+      overflow: hidden;
+    }
+
+    .insights {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.7rem;
+    }
+
+    .insight {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.72rem;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(245, 250, 252, 0.92));
+    }
+
+    .insight h4 {
+      margin: 0 0 0.4rem;
+      font-size: 0.95rem;
+    }
+
+    .insight p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .foot {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+      font-family: "IBM Plex Mono", monospace;
+      padding-bottom: 0.35rem;
+    }
+
+    @keyframes rise {
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 1080px) {
+      .metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .split-2 {
+        grid-template-columns: 1fr;
+      }
+      .gallery {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .insights {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .wrap {
+        width: calc(100% - 1rem);
+        margin: 0.55rem auto 1.1rem;
+      }
+      .panel {
+        border-radius: 16px;
+        padding: 0.82rem;
+      }
+      .hero {
+        padding: 0.95rem;
+      }
+      .metric .value {
+        font-size: 1.25rem;
+      }
+      .gallery {
+        grid-template-columns: 1fr;
+      }
+      .resource-card strong {
+        font-size: 0.92rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="grain"></div>
+  <main class="wrap">
+    <section class="panel hero" style="animation-delay: 0s;">
+      <h1>Hand Pose Estimation and Tracker Analysis Dashboard</h1>
+      <p>
+        Unified view of model training quality, validation metrics, tracking behavior, runtime speed,
+        and visual evidence extracted from both notebooks.
+      </p>
+      <div class="chip-row">
+        <span class="chip">YOLOv12s-Pose</span>
+        <span class="chip">Epochs: 50</span>
+        <span class="chip">Frames: 1423</span>
+        <span class="chip">Trackers: ByteTrack + BoT-SORT</span>
+      </div>
+    </section>
+
+    <section class="panel" style="animation-delay: 0.06s;">
+      <h2 class="title">Core Metrics <small>Training + Tracking</small></h2>
+      <div class="metric-grid">
+        <article class="metric">
+          <span class="label">Training Time</span>
+          <span class="value v-orange">55.1 min</span>
+          <span class="note">Single full run on Kaggle T4</span>
+        </article>
+        <article class="metric">
+          <span class="label">Box mAP@0.50</span>
+          <span class="value v-green">0.9634</span>
+          <span class="note">High bounding-box quality</span>
+        </article>
+        <article class="metric">
+          <span class="label">Pose mAP@0.50</span>
+          <span class="value v-blue">0.2113</span>
+          <span class="note">Keypoint localization still challenging</span>
+        </article>
+        <article class="metric">
+          <span class="label">Precision / Recall</span>
+          <span class="value v-rose">0.9585 / 0.9238</span>
+          <span class="note">Balanced detection reliability</span>
+        </article>
+        <article class="metric">
+          <span class="label">ByteTrack Throughput</span>
+          <span class="value v-green">26.5 FPS</span>
+          <span class="note">53.7s for 1423 frames</span>
+        </article>
+        <article class="metric">
+          <span class="label">BoT-SORT Throughput</span>
+          <span class="value v-blue">16.9 FPS</span>
+          <span class="note">84.3s for 1423 frames</span>
+        </article>
+        <article class="metric">
+          <span class="label">BoT-SORT Overhead</span>
+          <span class="value v-orange">+30.5s</span>
+          <span class="note">Compared to ByteTrack run time</span>
+        </article>
+        <article class="metric">
+          <span class="label">Zero-Detection Frames</span>
+          <span class="value v-rose">164 (11.5%)</span>
+          <span class="note">Identical in both trackers</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="split-2" style="animation-delay: 0.12s;">
+      <section class="panel">
+        <h2 class="title">Pose Training Quality Profile <small>Validation Metrics</small></h2>
+        <div class="chart-wrap">
+          <canvas id="trainingRadar"></canvas>
+        </div>
+      </section>
+      <section class="panel">
+        <h2 class="title">Tracker Speed Comparison <small>Runtime and FPS</small></h2>
+        <div class="chart-wrap">
+          <canvas id="speedBars"></canvas>
+        </div>
+      </section>
+    </section>
+
+    <section class="split-2" style="animation-delay: 0.18s;">
+      <section class="panel">
+        <h2 class="title">Tracker Stability Metrics <small>ByteTrack vs BoT-SORT</small></h2>
+        <div class="chart-wrap">
+          <canvas id="trackingBars"></canvas>
+        </div>
+      </section>
+      <section class="panel">
+        <h2 class="title">Important Hyperparameters <small>Most impactful settings</small></h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Parameter</th>
+                <th>Value</th>
+                <th>Why it matters</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Training</td><td>epochs</td><td>50</td><td>Sets total optimization length.</td></tr>
+              <tr><td>Training</td><td>imgsz</td><td>640</td><td>Controls pose detail versus speed.</td></tr>
+              <tr><td>Training</td><td>batch</td><td>16</td><td>Stable memory usage on T4 GPU.</td></tr>
+              <tr><td>Training</td><td>patience</td><td>15</td><td>Early stopping against overfitting.</td></tr>
+              <tr><td>Augmentation</td><td>mosaic / fliplr / flipud</td><td>1.0 / 0.5 / 0.0</td><td>Expands hand pose diversity.</td></tr>
+              <tr><td>Loss Weights</td><td>pose / kobj</td><td>12.0 / 1.0</td><td>Biases learning toward keypoints.</td></tr>
+              <tr><td>Tracking</td><td>conf / iou</td><td>0.30 / 0.50</td><td>Detection acceptance and NMS behavior.</td></tr>
+              <tr><td>Tracking</td><td>track_high_thresh</td><td>0.5</td><td>Strong detections for primary matching.</td></tr>
+              <tr><td>Tracking</td><td>track_low_thresh</td><td>0.1</td><td>Keeps weak detections for recovery.</td></tr>
+              <tr><td>Tracking</td><td>new_track_thresh</td><td>0.6</td><td>Reduces false new IDs.</td></tr>
+              <tr><td>BoT-SORT</td><td>gmc_method</td><td>sparseOptFlow</td><td>Compensates camera motion.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section class="split-2" style="animation-delay: 0.24s;">
+      <section class="panel">
+        <h2 class="title">Demo Video Placeholder <small>Directly playable on dashboard</small></h2>
+        <div class="video-shell">
+          <iframe
+            src="https://www.youtube.com/embed/gLujzpo9aH4"
+            title="Hand Pose Estimation Demo"
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allowfullscreen>
+          </iframe>
+        </div>
+        <p class="media-note">This large embed is ready and can be replaced with any new YouTube URL later.</p>
+      </section>
+      <section class="panel">
+        <h2 class="title">Project Links <small>Kaggle + YouTube</small></h2>
+        <div class="link-cards">
+          <a class="resource-card kaggle" href="https://www.kaggle.com/code/turjo410/cse445-yolov12s-hand-pose-training/notebook" target="_blank" rel="noopener noreferrer">
+            <strong>Kaggle Notebook (Open in new tab)</strong>
+            <span>https://www.kaggle.com/code/turjo410/cse445-yolov12s-hand-pose-training/notebook</span>
+          </a>
+          <a class="resource-card youtube" href="https://youtu.be/gLujzpo9aH4" target="_blank" rel="noopener noreferrer">
+            <strong>YouTube Video Link (Open in new tab)</strong>
+            <span>https://youtu.be/gLujzpo9aH4</span>
+          </a>
+        </div>
+      </section>
+    </section>
+
+    <section class="panel" style="animation-delay: 0.3s;">
+      <h2 class="title">Notebook Figures Gallery <small>Click any figure to enlarge</small></h2>
+      <div class="gallery">
+        <figure>
+          <img src="assets/extracted/cse445-yolov12s-hand-pose-training-cell9-out1.png" alt="Pose dataset sample grid" />
+          <figcaption>Hand training notebook: dataset pose visualization samples.</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/extracted/cse445-yolov12s-hand-pose-training-cell14-out2.png" alt="Training loss curves" />
+          <figcaption>Training notebook: loss curves from results.csv.</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/extracted/cse445-yolov12s-hand-pose-training-cell14-out3.png" alt="Training metric curves" />
+          <figcaption>Training notebook: precision, recall, and mAP curves.</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/extracted/cse445-yolov12s-hand-pose-training-cell16-out1.png" alt="Inference on validation images" />
+          <figcaption>Training notebook: qualitative validation inference panel.</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/extracted/cse445-yolov12s-video-tracking-cell5-out2.png" alt="Video sample frames" />
+          <figcaption>Tracking notebook: source video frame snapshots.</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/extracted/cse445-yolov12s-video-tracking-cell11-out1.png" alt="ByteTrack vs BoT-SORT side-by-side" />
+          <figcaption>Tracking notebook: side-by-side tracker output comparison.</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/extracted/cse445-yolov12s-video-tracking-cell14-out1.png" alt="Detection density over time" />
+          <figcaption>Tracking notebook: per-frame detection density curves.</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/extracted/cse445-yolov12s-video-tracking-cell16-out1.png" alt="Tracker bar chart" />
+          <figcaption>Tracking notebook: final quantitative comparison chart.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="panel" style="animation-delay: 0.36s;">
+      <h2 class="title">Key Insights <small>What the numbers imply</small></h2>
+      <div class="insights">
+        <article class="insight">
+          <h4>Detection is strong, pose is the bottleneck</h4>
+          <p>
+            Box metrics are high (mAP@0.50 = 0.9634), while pose mAP values are much lower.
+            This pattern indicates the model identifies hand regions well, but accurate keypoint localization remains harder.
+          </p>
+        </article>
+        <article class="insight">
+          <h4>ByteTrack is significantly faster</h4>
+          <p>
+            ByteTrack reaches 26.5 FPS versus 16.9 FPS for BoT-SORT.
+            In this dataset, both trackers report nearly identical continuity metrics, so speed becomes the deciding factor.
+          </p>
+        </article>
+        <article class="insight">
+          <h4>Zero-detection frames remain a reliability target</h4>
+          <p>
+            164 frames (11.5%) contain no detections in both tracker outputs.
+            Improving pose detector robustness under motion blur/occlusion should improve tracker behavior more than tracker tuning alone.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <div class="lightbox" id="lightbox" aria-hidden="true">
+      <div class="lightbox-inner">
+        <button class="lightbox-close" id="lightboxClose" type="button" aria-label="Close enlarged image">Close</button>
+        <img id="lightboxImage" alt="Expanded notebook figure" />
+        <div class="lightbox-caption" id="lightboxCaption"></div>
+      </div>
+    </div>
+
+    <div class="foot">Generated from cse445-yolov12s-hand-pose-training.ipynb and cse445-yolov12s-video-tracking.ipynb</div>
+  </main>
+
+  <script>
+    const trainingMetrics = {
+      labels: [
+        "Box mAP@0.50",
+        "Box mAP@0.50:0.95",
+        "Pose mAP@0.50",
+        "Pose mAP@0.50:0.95",
+        "Precision",
+        "Recall"
+      ],
+      values: [0.9634, 0.7039, 0.2113, 0.0375, 0.9585, 0.9238]
+    };
+
+    const trackerSpeed = {
+      names: ["ByteTrack", "BoT-SORT"],
+      fps: [26.5, 16.9],
+      seconds: [53.7, 84.3]
+    };
+
+    const trackerQuality = {
+      labels: ["Unique IDs", "ID Switches", "Zero Frames", "Avg Life (s)"],
+      bytetrack: [2, 18, 164, 25.2],
+      botsort: [2, 18, 164, 25.2]
+    };
+
+    new Chart(document.getElementById("trainingRadar"), {
+      type: "radar",
+      data: {
+        labels: trainingMetrics.labels,
+        datasets: [{
+          label: "Validation score",
+          data: trainingMetrics.values,
+          fill: true,
+          borderColor: "#ff7b00",
+          backgroundColor: "rgba(255, 123, 0, 0.22)",
+          pointBackgroundColor: ["#ff7b00", "#1fbf75", "#1588ff", "#ef476f", "#1fbf75", "#1588ff"],
+          pointBorderColor: "#fff",
+          pointRadius: 4,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        scales: {
+          r: {
+            min: 0,
+            max: 1,
+            angleLines: { color: "rgba(16, 32, 41, 0.12)" },
+            grid: { color: "rgba(16, 32, 41, 0.12)" },
+            ticks: {
+              display: true,
+              backdropColor: "rgba(255,255,255,0.8)",
+              color: "#3f5966",
+              z: 100,
+              stepSize: 0.2
+            },
+            pointLabels: {
+              color: "#16303b",
+              font: { family: "Bricolage Grotesque", size: 12, weight: "600" }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            labels: {
+              color: "#16303b",
+              font: { family: "IBM Plex Mono" }
+            }
+          }
+        }
+      }
+    });
+
+    new Chart(document.getElementById("speedBars"), {
+      data: {
+        labels: trackerSpeed.names,
+        datasets: [{
+          type: "bar",
+          label: "FPS",
+          data: trackerSpeed.fps,
+          backgroundColor: ["rgba(31, 191, 117, 0.85)", "rgba(21, 136, 255, 0.85)"],
+          borderRadius: 10,
+          yAxisID: "y"
+        }, {
+          type: "line",
+          label: "Runtime (s)",
+          data: trackerSpeed.seconds,
+          borderColor: "#ef476f",
+          backgroundColor: "#ef476f",
+          tension: 0.35,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          yAxisID: "y1"
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            position: "left",
+            beginAtZero: true,
+            title: { display: true, text: "FPS" },
+            grid: { color: "rgba(16, 32, 41, 0.08)" }
+          },
+          y1: {
+            position: "right",
+            beginAtZero: true,
+            title: { display: true, text: "Seconds" },
+            grid: { drawOnChartArea: false }
+          }
+        },
+        plugins: {
+          legend: {
+            labels: {
+              color: "#16303b",
+              font: { family: "IBM Plex Mono" }
+            }
+          }
+        }
+      }
+    });
+
+    new Chart(document.getElementById("trackingBars"), {
+      type: "bar",
+      data: {
+        labels: trackerQuality.labels,
+        datasets: [{
+          label: "ByteTrack",
+          data: trackerQuality.bytetrack,
+          backgroundColor: "rgba(31, 191, 117, 0.84)",
+          borderRadius: 9
+        }, {
+          label: "BoT-SORT",
+          data: trackerQuality.botsort,
+          backgroundColor: "rgba(21, 136, 255, 0.84)",
+          borderRadius: 9
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: "rgba(16, 32, 41, 0.08)" }
+          }
+        },
+        plugins: {
+          legend: {
+            labels: {
+              color: "#16303b",
+              font: { family: "IBM Plex Mono" }
+            }
+          }
+        }
+      }
+    });
+
+    const lightbox = document.getElementById("lightbox");
+    const lightboxImage = document.getElementById("lightboxImage");
+    const lightboxCaption = document.getElementById("lightboxCaption");
+    const lightboxClose = document.getElementById("lightboxClose");
+
+    function openLightbox(src, alt, caption) {
+      lightboxImage.src = src;
+      lightboxImage.alt = alt || "Expanded figure";
+      lightboxCaption.textContent = caption || "";
+      lightbox.classList.add("open");
+      lightbox.setAttribute("aria-hidden", "false");
+      document.body.classList.add("lightbox-open");
+      lightboxClose.focus();
+    }
+
+    function closeLightbox() {
+      lightbox.classList.remove("open");
+      lightbox.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("lightbox-open");
+      lightboxImage.src = "";
+    }
+
+    document.querySelectorAll(".gallery figure").forEach((figure) => {
+      const img = figure.querySelector("img");
+      const caption = figure.querySelector("figcaption");
+      if (!img) return;
+
+      figure.setAttribute("tabindex", "0");
+      figure.setAttribute("role", "button");
+      figure.setAttribute("aria-label", "Open image in enlarged view");
+
+      figure.addEventListener("click", () => {
+        openLightbox(img.src, img.alt, caption ? caption.textContent.trim() : "");
+      });
+
+      figure.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openLightbox(img.src, img.alt, caption ? caption.textContent.trim() : "");
+        }
+      });
+    });
+
+    lightboxClose.addEventListener("click", closeLightbox);
+    lightbox.addEventListener("click", (event) => {
+      if (event.target === lightbox) {
+        closeLightbox();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && lightbox.classList.contains("open")) {
+        closeLightbox();
+      }
+    });
+  </script>
+</body>
+</html>

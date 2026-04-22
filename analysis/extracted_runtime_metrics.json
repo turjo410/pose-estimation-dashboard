@@ -1,0 +1,222 @@
+{
+  "cse445-yolov12s-hand-pose-training.ipynb": {
+    "key_lines": [
+      {
+        "cell_number": 11,
+        "line": "\u2705 Training complete in 55.1 minutes"
+      },
+      {
+        "cell_number": 13,
+        "line": "Box  mAP@0.50:      0.9634"
+      },
+      {
+        "cell_number": 13,
+        "line": "Box  mAP@0.50:0.95: 0.7039"
+      },
+      {
+        "cell_number": 13,
+        "line": "Pose mAP@0.50:      0.2113"
+      },
+      {
+        "cell_number": 13,
+        "line": "Pose mAP@0.50:0.95: 0.0375"
+      },
+      {
+        "cell_number": 13,
+        "line": "Precision:          0.9585"
+      },
+      {
+        "cell_number": 13,
+        "line": "Recall:             0.9238"
+      },
+      {
+        "cell_number": 14,
+        "line": "Epochs trained: 50"
+      }
+    ],
+    "hand_training_metrics": {
+      "training_time_minutes": 55.1,
+      "box_map50": 0.9634,
+      "box_map50_95": 0.7039,
+      "pose_map50": 0.2113,
+      "pose_map50_95": 0.0375,
+      "precision": 0.9585,
+      "recall": 0.9238,
+      "epochs_trained": 50
+    },
+    "tracking_runtime": {},
+    "tracker_stats": {}
+  },
+  "cse445-yolov12s-video-tracking.ipynb": {
+    "key_lines": [
+      {
+        "cell_number": 3,
+        "line": "Video: /kaggle/input/datasets/turjo410/videoooo/10209557-hd_720_1366_25fps.mp4"
+      },
+      {
+        "cell_number": 5,
+        "line": "Video:      10209557-hd_720_1366_25fps.mp4"
+      },
+      {
+        "cell_number": 5,
+        "line": "FPS:        25.0"
+      },
+      {
+        "cell_number": 7,
+        "line": "\u2705 ByteTrack complete in 53.7s (1423 frames)"
+      },
+      {
+        "cell_number": 7,
+        "line": "FPS: 26.5"
+      },
+      {
+        "cell_number": 9,
+        "line": "\u2705 BoT-SORT complete in 84.3s (1423 frames)"
+      },
+      {
+        "cell_number": 9,
+        "line": "FPS: 16.9"
+      },
+      {
+        "cell_number": 9,
+        "line": "\u23f1\ufe0f  Speed Comparison"
+      },
+      {
+        "cell_number": 9,
+        "line": "ByteTrack: 26.5 fps (53.7s total)"
+      },
+      {
+        "cell_number": 9,
+        "line": "BoT-SORT:  16.9 fps (84.3s total)"
+      },
+      {
+        "cell_number": 9,
+        "line": "Overhead:  30.5s extra for BoT-SORT"
+      },
+      {
+        "cell_number": 13,
+        "line": "\ud83d\udcca ByteTrack Statistics"
+      },
+      {
+        "cell_number": 13,
+        "line": "Total frames processed:   1423"
+      },
+      {
+        "cell_number": 13,
+        "line": "Unique track IDs issued:  2"
+      },
+      {
+        "cell_number": 13,
+        "line": "ID switch events:         18"
+      },
+      {
+        "cell_number": 13,
+        "line": "Avg detections/frame:     0.88"
+      },
+      {
+        "cell_number": 13,
+        "line": "Max detections/frame:     1"
+      },
+      {
+        "cell_number": 13,
+        "line": "Avg track lifetime (fr):  629.5 (25.2s)"
+      },
+      {
+        "cell_number": 13,
+        "line": "Frames with 0 detections: 164 (11.5%)"
+      },
+      {
+        "cell_number": 13,
+        "line": "\ud83d\udcca BoT-SORT Statistics"
+      },
+      {
+        "cell_number": 13,
+        "line": "Total frames processed:   1423"
+      },
+      {
+        "cell_number": 13,
+        "line": "Unique track IDs issued:  2"
+      },
+      {
+        "cell_number": 13,
+        "line": "ID switch events:         18"
+      },
+      {
+        "cell_number": 13,
+        "line": "Avg detections/frame:     0.88"
+      },
+      {
+        "cell_number": 13,
+        "line": "Max detections/frame:     1"
+      },
+      {
+        "cell_number": 13,
+        "line": "Avg track lifetime (fr):  629.5 (25.2s)"
+      },
+      {
+        "cell_number": 13,
+        "line": "Frames with 0 detections: 164 (11.5%)"
+      },
+      {
+        "cell_number": 13,
+        "line": "Metric                  | ByteTrack  | BoT-SORT"
+      },
+      {
+        "cell_number": 13,
+        "line": "Unique IDs issued       |          2 |        2"
+      },
+      {
+        "cell_number": 13,
+        "line": "ID switch events        |         18 |       18"
+      },
+      {
+        "cell_number": 13,
+        "line": "Avg detections/frame    |       0.88 |     0.88"
+      },
+      {
+        "cell_number": 13,
+        "line": "Avg track lifetime (s)  |       25.2 |     25.2"
+      },
+      {
+        "cell_number": 13,
+        "line": "Zero-detection frames   |        164 |      164"
+      }
+    ],
+    "hand_training_metrics": {},
+    "tracking_runtime": {
+      "bytetrack_seconds": 53.7,
+      "bytetrack_frames": 1423,
+      "botsort_seconds": 84.3,
+      "botsort_frames": 1423,
+      "bytetrack_fps": 26.5,
+      "botsort_fps": 16.9,
+      "botsort_overhead_seconds": 30.5
+    },
+    "tracker_stats": {
+      "ByteTrack": {
+        "tracker": "ByteTrack",
+        "frames": 1423,
+        "unique_ids": 2,
+        "id_switches": 18,
+        "avg_det": 0.88,
+        "max_det": 1,
+        "avg_lifetime_frames": 629.5,
+        "avg_lifetime_seconds": 25.2,
+        "zero_frames": 164,
+        "zero_pct": 11.5
+      },
+      "BoT-SORT": {
+        "tracker": "BoT-SORT",
+        "frames": 1423,
+        "unique_ids": 2,
+        "id_switches": 18,
+        "avg_det": 0.88,
+        "max_det": 1,
+        "avg_lifetime_frames": 629.5,
+        "avg_lifetime_seconds": 25.2,
+        "zero_frames": 164,
+        "zero_pct": 11.5
+      }
+    }
+  }
+}
